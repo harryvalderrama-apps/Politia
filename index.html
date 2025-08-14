@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Politia</title>
+<meta name="theme-color" content="#0A4FB5">
+<style>
+  body{font-family:system-ui,Segoe UI,Roboto;margin:0;background:#0A4FB5;color:#fff}
+  .wrap{max-width:980px;margin:32px auto;padding:0 16px}
+  header{display:flex;justify-content:space-between;align-items:center}
+  .brand{display:flex;gap:8px;align-items:center}
+  .logo{width:24px;height:24px;border-radius:6px;background:#fff}
+  .btn{border:none;border-radius:12px;padding:12px 16px;font-weight:900;cursor:pointer}
+  .btn.primary{background:#fff;color:#0A4FB5}
+  .btn.ghost{background:transparent;border:2px solid #fff;color:#fff}
+  .card{background:#fff;color:#0b1b2e;border-radius:16px;padding:20px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+  .center{display:flex;justify-content:center}
+  .stack{display:flex;flex-direction:column;gap:10px;align-items:stretch}
+  input,textarea{width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:12px;font-size:16px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .hidden{display:none}
+  .avatar{width:36px;height:36px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-weight:900}
+  ul{list-style:none;padding:0;margin:0}
+  .post{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;color:#0b1b2e}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo"></div><strong>Politia</strong></div>
+    <div class="row">
+      <button id="btnProfile" class="btn ghost" onclick="alert('Perfil demo')">Perfil</button>
+      <button id="btnLogout" class="btn ghost">Salir</button>
+    </div>
+  </header>
+
+  <!-- LOGIN -->
+  <div id="auth" class="center" style="margin:40px 0">
+    <div class="card" style="max-width:460px;width:100%">
+      <div class="stack">
+        <h2 style="margin:6px 0;text-align:center">Politia</h2>
+        <label>Correo</label>
+        <input id="email" type="email" placeholder="demo@politia.app" value="demo@politia.app">
+        <label>Contraseña</label>
+        <input id="pass" type="password" placeholder="12345" value="12345">
+        <div class="row">
+          <button id="btnLogin" class="btn ghost" type="button">Entrar (demo)</button>
+          <button id="btnRegister" class="btn primary" type="button">Registrarme</button>
+        </div>
+        <small style="opacity:.85">* Demo offline: tu cuenta vive sólo en este dispositivo.</small>
+        <div id="msg" style="color:#b91c1c;font-weight:700"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app" class="hidden">
+    <h3>Hola, <span id="me">@usuario</span></h3>
+    <div class="card" style="margin-bottom:16px">
+      <div class="row" style="align-items:center;margin-bottom:8px">
+        <div class="avatar" id="ava">U</div>
+        <strong style="margin-left:6px">Crear publicación</strong>
+      </div>
+      <textarea id="texto" rows="4" placeholder="Escribe…"></textarea>
+      <div class="row" style="margin-top:8px">
+        <input id="file" type="file" accept="image/*" multiple capture="environment">
+        <button id="btnPost" class="btn primary" type="button">Publicar</button>
+      </div>
+      <div id="thumbs" class="row" style="margin-top:8px"></div>
+    </div>
+
+    <ul id="feed"></ul>
+  </div>
+</div>
+
+<script>
+const K={user:'auth_user',users:'auth_users',posts:'pro_posts'};
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(d));}catch{return d;}};
+const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const initials=n=>(n||'U').split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+
+// hash de respaldo (demo)
+function demoHash(s){ let h=5381; for(let i=0;i<s.length;i++){h=((h<<5)+h)+s.charCodeAt(i);h|=0} return (h>>>0).toString(16); }
+async function hash(pass){
+  try{
+    if(window.crypto?.subtle){
+      const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch(e){}
+  return 'demo-'+demoHash(pass);
+}
+
+function showApp(v){ $('#auth').classList.toggle('hidden',v); $('#app').classList.toggle('hidden',!v); }
+
+let USER=load(K.user,null);
+if(USER){ enter(); }
+
+$('#btnLogin').onclick = async ()=>{
+  const email=$('#email').value.trim()||'demo@politia.app';
+  const pass=$('#pass').value||'12345';
+  const users=load(K.users,{});
+  if(!users[email]){ // si no existe, crea al vuelo (demo)
+    users[email]={email,hash:await hash(pass),name:email.split('@')[0]};
+    save(K.users,users);
+  }
+  const ok=(users[email].hash===await hash(pass));
+  if(!ok){ $('#msg').textContent='Contraseña incorrecta (demo: 12345)'; return; }
+  save(K.user, users[email]); USER=users[email]; enter();
+};
+
+$('#btnRegister').onclick = async ()=>{
+  const email=$('#email').value.trim();
+  const pass=$('#pass').value;
+  if(!email||!pass){ $('#msg').textContent='Completa correo y contraseña'; return; }
+  let users=load(K.users,{});
+  if(users[email]){ $('#msg').textContent='Ese correo ya existe. Usa Entrar.'; return; }
+  users[email]={email,hash:await hash(pass),name:email.split('@')[0]};
+  save(K.users,users); save(K.user,users[email]); USER=users[email]; enter();
+};
+
+$('#btnLogout').onclick = ()=>{ localStorage.removeItem(K.user); USER=null; showApp(false); };
+
+function enter(){
+  showApp(true);
+  $('#me').textContent='@'+(USER.name||'usuario');
+  $('#ava').textContent=initials(USER.name);
+  renderFeed();
+}
+
+// publicar
+let IMGS=[];
+$('#file').addEventListener('change', e=>{
+  const files=Array.from(e.target.files||[]);
+  const readers=files.map(f=>new Promise(res=>{const r=new FileReader(); r.onload=(ev)=>res(ev.target.result); r.readAsDataURL(f);}));
+  Promise.all(readers).then(imgs=>{ IMGS=IMGS.concat(imgs).slice(0,6); drawThumbs(); });
+});
+function drawThumbs(){ const box=$('#thumbs'); box.innerHTML=''; IMGS.forEach(src=>{ const img=new Image(); img.src=src; img.style.cssText='max-width:120px;border-radius:8px'; box.appendChild(img); }); }
+
+$('#btnPost').onclick = ()=>{
+  const t=$('#texto').value.trim(); if(!t){ alert('Escribe el texto'); return; }
+  const posts=load(K.posts,[]);
+  posts.push({id:Date.now(), author:USER.name, text:t, images:IMGS, created_at:Date.now()});
+  save(K.posts,posts);
+  $('#texto').value=''; IMGS=[]; drawThumbs(); renderFeed();
+};
+
+function renderFeed(){
+  const list=$('#feed'); list.innerHTML='';
+  load(K.posts,[]).sort((a,b)=>b.created_at-a.created_at).forEach(p=>{
+    const li=document.createElement('li'); li.className='post';
+    const pics=(p.images||[]).map(src=>`<img src="${src}" style="max-width:160px;border-radius:8px;margin-right:6px">`).join('');
+    li.innerHTML = `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <div class="avatar">${initials(p.author)}</div>
+        <strong>${p.author}</strong>
+        <span style="margin-left:auto;opacity:.7">${new Date(p.created_at).toLocaleString()}</span>
+      </div>
+      <div>${p.text.replace(/</g,'&lt;')}</div>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">${pics}</div>
+    `;
+    list.appendChild(li);
+  });
+}
+</script>
+</body>
+</html>
